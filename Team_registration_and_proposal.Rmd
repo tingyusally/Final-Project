@@ -1,6 +1,5 @@
 ---
 title: "Team_registration_and_proposal"
-author: "linshan"
 date: "2024-11-05"
 output: github_document
 ---
@@ -21,15 +20,17 @@ Yunjia Liu(yl5830), Linshan Xie(lx2346), Jianming Wang(jw4693), Yuwei Xia(yx2953
  
  
 #### Analyses/ Visualizations
+Our planned analyses using the Los Angeles Police Department crime dataset include the following:\
 
-
-
+1. **Victim Demographics**: Examining potential disparities across age, gender, and racial groups.\
+2. **Temporal Trends of Crime**: Analyzing trends in crime occurrence across different years and months, as well as examining the frequency of incidents by day and by time of day.\
+3. **Primary Locations of Crime**: Conducting a multivariate association analysis, incorporating factors such as time to identify key types of crime locations.
+4. **Geospatial Mapping of Crime**: Using latitude and longitude data to display crime severity on mobile-friendly interactive maps.
 
 #### Coding challenges
 
 
 #### Planned Timeline
-
 
 
 #### Reference links
