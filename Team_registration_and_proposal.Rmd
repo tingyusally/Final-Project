@@ -30,10 +30,9 @@ Our planned analyses using the Los Angeles Police Department crime dataset inclu
 4. **Geospatial Mapping of Crime**: Using latitude and longitude data to display crime severity on mobile-friendly interactive maps.\
 
 #### Coding challenges
-
+1. Large amount of data and high number of missing values in some varibale.\
+2. There are numerous region/case type codes that need data type conversion.\
+3. Generating a neat and informative website.
 
 #### Planned Timeline
 
-
-#### Reference link
-1. https://www.kaggle.com/datasets/arpitsinghaiml/u-s-crime-dataset/data
