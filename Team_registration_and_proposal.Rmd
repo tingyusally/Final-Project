@@ -35,4 +35,9 @@ Our planned analyses using the Los Angeles Police Department crime dataset inclu
 3. Generating a neat and informative website.
 
 #### Planned Timeline
+* _02Nov24 - 08Nov24_: Proposal development 
+* _09Nov24 - 18Nov24_: Exploratory analysis, table construction, data-cleaning
+* _19Nov24 - 09Dec24_: Crunch Time (Write report, statistical analyses and figure development)
+* _10Dec24 - 17Dec24_: Website Construction and Adjustment
+* _18Dec24_: Project report, website, webcast, and team evals due
 
