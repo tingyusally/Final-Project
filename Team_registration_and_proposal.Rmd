@@ -7,11 +7,13 @@ output: github_document
 #### Group members
 Yunjia Liu(yl5830), Linshan Xie(lx2346), Jianming Wang(jw4693), Yuwei Xia(yx2953), Tingyu Qian(tq2171)
  
+
 #### Project title
 Data-Driven Insights for Community Safety in Los Angeles: Analyzing Crime Patterns and Trends in Recent Years
 
 #### Motivation/ Statement of Purpose
-
+Los Angeles is a city of vibrant diversity and a lively urban landscape—but it’s also a city where the dynamics of crime can vary widely across neighborhoods, demographic groups, and even times of day. For law enforcement, policymakers, and community members alike, understanding these complex crime patterns is key to fostering safer and more resilient communities.\
+Our project dives into the Los Angeles Police Department crime dataset to uncover the "who, what, where, and when" of crime across LA's diverse neighborhoods. We're on a mission to decode the patterns of crime by exploring how different demographics, time frames, and locations shape the city's unique crime profile. Whether it's catching late-night trends, uncovering hotspots, or spotlighting demographic factors, we’re here to map the hidden story of LA’s crime scene and uncover what drives certain areas' steady patterns—or sudden disruptions!
  
 #### Intended final product
  
@@ -24,8 +26,8 @@ Our planned analyses using the Los Angeles Police Department crime dataset inclu
 
 1. **Victim Demographics**: Examining potential disparities across age, gender, and racial groups.\
 2. **Temporal Trends of Crime**: Analyzing trends in crime occurrence across different years and months, as well as examining the frequency of incidents by day and by time of day.\
-3. **Primary Locations of Crime**: Conducting a multivariate association analysis, incorporating factors such as time to identify key types of crime locations.
-4. **Geospatial Mapping of Crime**: Using latitude and longitude data to display crime severity on mobile-friendly interactive maps.
+3. **Primary Locations of Crime**: Conducting a multivariate association analysis, incorporating factors such as time to identify key types of crime locations.\
+4. **Geospatial Mapping of Crime**: Using latitude and longitude data to display crime severity on mobile-friendly interactive maps.\
 
 #### Coding challenges
 
@@ -33,5 +35,5 @@ Our planned analyses using the Los Angeles Police Department crime dataset inclu
 #### Planned Timeline
 
 
-#### Reference links
+#### Reference link
 1. https://www.kaggle.com/datasets/arpitsinghaiml/u-s-crime-dataset/data
