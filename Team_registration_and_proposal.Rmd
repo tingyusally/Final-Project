@@ -16,10 +16,10 @@ Los Angeles is a city of vibrant diversity and a lively urban landscape—but it
 Our project dives into the Los Angeles Police Department crime dataset to uncover the "who, what, where, and when" of crime across LA's diverse neighborhoods. We're on a mission to decode the patterns of crime by exploring how different demographics, time frames, and locations shape the city's unique crime profile. Whether it's catching late-night trends, uncovering hotspots, or spotlighting demographic factors, we’re here to map the hidden story of LA’s crime scene and uncover what drives certain areas' steady patterns—or sudden disruptions!
  
 #### Intended final product
- 
+
  
 #### Data sources
- 
+This is a dataset of recent crime data from Los Angeles, covering a wide range of crime types, from violent crimes like homicide and assault to property crimes like theft and burglary. The data is carefully organized, providing insights into crime trends, geographic differences, and temporal patterns. The dataset can be downloaded directly from https://www.kaggle.com/datasets/arpitsinghaiml/u-s-crime-dataset/data.
  
 #### Analyses/ Visualizations
 Our planned analyses using the Los Angeles Police Department crime dataset include the following:\
