@@ -8,7 +8,7 @@ output: github_document
 Yunjia Liu(yl5830), Linshan Xie(lx2346), Jianming Wang(jw4693), Yuwei Xia(yx2953), Tingyu Qian(tq2171)
  
 #### Project title
-
+Data-Driven Insights for Community Safety in LA: Analyzing Crime Patterns and Trends in Recent Years
 
 #### Motivation/ Statement of Purpose
 
