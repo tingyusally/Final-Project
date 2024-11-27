@@ -9,6 +9,15 @@ runtime: shiny
 
 ```{r setup, include=FALSE}
 library(flexdashboard)
+library(tidyverse)
+library(plotly)
+library(rsconnect)
+library(leaflet)
+
+squirrel_census = 
+  read_csv(".data/clean_squirrel_2018.csv") |> 
+  janitor::clean_names()
+
 ```
 
 Column {.sidebar}
