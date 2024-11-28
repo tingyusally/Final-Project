@@ -1,30 +1,491 @@
 ---
-title: "time"
-author: "Tingyu Qian"
-date: "2024-11-20"
-output: html_document
+title: "Crime Trends Over Time"
+output: 
+  html_document:
+    code_folding: hide
+    always_allow_html: true
+    toc: true
+    toc_float: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(plotly)
 ```
 
-## R Markdown
+```{r include=FALSE}
+data = read_csv("./data/crime_data_LA.csv", na = c("NA", ".", ""))
+data = data |>
+  select(dr_no ,date = date_occ, time = time_occ, area = area_name, severity = part_1_2, crime_type = crm_cd_desc, premis = premis_desc) |>
+  mutate(
+    severity = case_when(
+    severity == 1 ~ "serious",
+    severity == 2 ~ "less serious"
+  ) )|>
+    mutate(severity = factor(severity, levels = c("less serious", "serious"), ordered = TRUE),
+           crime_type = tolower(crime_type))
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+data = data |>
+  mutate(date = as.Date(sub(" .*", "", data$date), format = "%m/%d/%Y"))
+data$time = sprintf("%04s", as.character(data$time))
+data$time = format(strptime(data$time, format="%H%M"), "%H:%M")
 ```
 
-## Including Plots
+Explore the patterns and trends in crime occurrences based on various time scales (yearly, seasonal, weekdays, and hourly). This web page allows you to visualize how crime evolves over time and across different dimensions.
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+## Overall Trend 
+```{r include=FALSE}
+data = data |>
+  mutate(
+    year_month = floor_date(data$date, unit = "month"),
+    month = month(date),
+    season = case_when(
+      month %in% 3:5 ~ "Spring",
+      month %in% 6:8 ~ "Summer",
+      month %in% 9:11 ~ "Fall",
+      month %in% c(12,1,2) ~ "Winter",
+      TRUE ~ "Unknown"
+    ),
+    hour_period = sub(":(.*)", "", data$time),
+    year = year(date),
+    weekday = wday(date, label = TRUE, abbr = FALSE)
+  )
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r warning=FALSE, message=FALSE}
+data |>
+  group_by(year_month, severity) |>
+  summarise(daily_count = n()) |>
+  ggplot(aes(x = year_month, y = daily_count, color = severity)) +
+  geom_line(size = 1) +
+  labs(title = "Trends in Severe and Non-Severe Crimes",
+       x = "Time", 
+       y = "Crime Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+## Annual Trends
+### Yearly Crime Counts
+\
+This section shows how the frequency of crimes has changed year by year.\
+```{r warning=FALSE, message=FALSE}
+data |>
+  filter(year != 2024) |>
+  group_by(year) |>
+  summarize(count = n()) |>
+  knitr::kable()
+```
+
+```{r warning=FALSE, message=FALSE}
+data |>
+  filter(year != 2024) |>
+  group_by(year) |>
+  summarize(year_count = n()) |>
+  ggplot(aes(x = as.factor(year), y = year_count, fill = as.factor(year))) +
+  geom_bar(stat = "identity", width = 0.5) +  
+  geom_text(aes(label = year_count), vjust = -0.5, size = 3) +
+  labs(title = "Yearly Crime Counts",
+       x = "Year",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### Serious vs. Less Serious Crimes
+
+```{r warning=FALSE, message=FALSE}
+data |>
+  filter(year != 2024) |>
+  group_by(year, severity) |>
+  summarize(year_count = n()) |>
+  ggplot(aes(x = as.factor(year), y = year_count, fill = severity)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.5, alpha = 0.7) +  
+  geom_text(aes(label = year_count, group = severity), position = position_stack(vjust = 0.5)) +
+  labs(title = "Yearly Crime Counts",
+       x = "Year",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+```
+\
+Use chi-squared test to check if there is a significant relationship between year and crime severity.
+```{r warning=FALSE, message=FALSE}
+year_ser = data |>
+  filter(year != 2024) |>
+  group_by(year, severity) |>
+  summarize(year_count = n()) |>
+  pivot_wider(
+    names_from = year,
+    values_from = year_count
+  )
+knitr::kable(year_ser)
+
+data_matrix = as.table(as.matrix(year_ser[, -1]))
+chi_result = chisq.test(data_matrix)
+chi_result
+```
+\
+This indicates that there are significant differences in the distribution of severity of cases between years. This means that there are differences in the proportion of cases occurring in terms of severity between years. Across all years, 2023 is more likely to have serious cases, while 2021 is more likely to have less serious cases.
+
+### Crime by Area
+Now, a line graph is used to show the change in the number of cases occurring in different and years for different case types.
+```{r warning=FALSE, message=FALSE}
+area_year = data |>
+  filter(year != 2024) |>
+  group_by(year, area) |>
+  summarize(year_count = n()) |>
+  ggplot(aes(x = as.factor(year), y = year_count, color = area, group = area)) +
+  geom_line(size = 0.5, alpha = 0.5) +  
+  geom_point(size = 0.7) +
+  labs(title = "Crime Counts by Area Over Time",
+       x = "Year",
+       y = "Number of Crimes",
+       color = "Area") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplotly(area_year)
+  
+```
+From the general trend observed in the line chart, the lines show an upward trend from 2021 to 2022, followed by a downward trend from 2022 to 2023. This indicates that the number of crimes in 2022 increased compared to 2020, 2021, and 2023. Particularly in the Central area, the number of crimes in 2022 saw a significant increase compared to 2021. Regarding the frequency of incidents, there are also significant differences between areas. Areas like `Central`, `77 Street`, and `Pacific` report a high number of crimes each year, with annual crime counts exceeding 10,000, and the peak years even reaching up to 17,000 incidents. In contrast, areas like `Devonshire`, `Hollenbeck`, and `Mission` experience fewer crimes each year, with counts typically ranging from 7,500 to 9,000 incidents.
+
+### Crime Types Over Year
+```{r warning=FALSE, message=FALSE}
+crime_year = data |>
+  filter(year != 2024) |>
+  group_by(crime_type, year) |>
+  summarize(year_count = n()) |>
+  mutate(year_count = ifelse(is.na(year_count), 0, year_count)) |>
+  ggplot(aes(x = year, y = year_count, color = crime_type, group = crime_type)) +
+  geom_line(size = 0.3, alpha = 0.5) +  
+  geom_point(size = 0.5) +
+  labs(title = "Crime Counts by Area Over Time",
+       x = "Year",
+       y = "Number of Crimes",
+       color = "Area") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+
+ggplotly(crime_year)
+```
+
+\
+
+## Seasonal Trends
+### Crime Counts By Season
+```{r warning=FALSE, message=FALSE}
+data |>
+  filter(year != 2024) |>
+  group_by(season) |>
+  summarize(count = n()) |>
+  knitr::kable()
+```
+
+```{r warning=FALSE, message=FALSE}
+data |>
+  filter(year != 2024) |>
+  group_by(season) |>
+  summarize(season_count = n()) |>
+  ggplot(aes(x = as.factor(season), y = season_count, fill = season)) +
+  geom_bar(stat = "identity", width = 0.5) +  
+  geom_text(aes(label = season_count), vjust = -0.5, size = 3) +
+  labs(title = "Crime Counts By Season",
+       x = "Season",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### Serious vs. Less Serious Crimes
+
+```{r warning=FALSE, message=FALSE}
+data |>
+  filter(year != 2024) |>
+  mutate(season = factor(season, levels = c("Spring", "Summer", "Fall", "Winter"))) |>
+  group_by(season, severity) |>
+  summarize(season_count = n()) |>
+  ggplot(aes(x = as.factor(season), y = season_count, fill = severity)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.5, alpha = 0.7) +  
+  geom_text(aes(label = season_count, group = severity), position = position_stack(vjust = 0.5)) +
+  labs(title = "Crime Counts By Season and Severity",
+       x = "Season",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+```
+\
+Use chi-squared test to check if there is a significant relationship between year and crime severity.
+```{r warning=FALSE, message=FALSE}
+season_ser = data |>
+  filter(year != 2024) |>
+  mutate(season = factor(season, levels = c("Spring", "Summer", "Fall", "Winter"))) |>
+  group_by(season, severity) |>
+  summarize(season_count = n()) |>
+  pivot_wider(
+    names_from = season,
+    values_from = season_count
+  )
+knitr::kable(season_ser)
+
+data_matrix = as.table(as.matrix(season_ser[, -1]))
+chi_result = chisq.test(data_matrix)
+chi_result
+```
+\
+This indicates that there are significant differences in the distribution of severity of cases between years. This means that there are differences in the proportion of cases occurring in terms of severity between years. Across all years, 2023 is more likely to have serious cases, while 2021 is more likely to have less serious cases.
+
+### Crime by Area
+Now, a line graph is used to show the change in the number of cases occurring in different seasons and different case types.
+```{r warning=FALSE, message=FALSE}
+area_season = data |>
+  filter(year != 2024) |>
+  mutate(season = factor(season, levels = c("Spring", "Summer", "Fall", "Winter"))) |>
+  group_by(season, area) |>
+  summarize(season_count = n()) |>
+  ggplot(aes(x = as.factor(season), y = season_count, color = area, group = area)) +
+  geom_line(size = 0.5, alpha = 0.5) +  
+  geom_point(size = 0.7) +
+  labs(title = "Crime Counts by Area Over Season",
+       x = "Season",
+       y = "Number of Crimes",
+       color = "Area") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplotly(area_season)
+  
+```
+加一些论述！！！
+
+### Crime Types Over Year
+```{r warning=FALSE, message=FALSE}
+crime_year = data |>
+  filter(year != 2024) |>
+  mutate(season = factor(season, levels = c("Spring", "Summer", "Fall", "Winter"))) |>
+  group_by(crime_type, season) |>
+  summarize(season_count = n()) |>
+  mutate(season_count = ifelse(is.na(season_count), 0, season_count)) |>
+  ggplot(aes(x = season, y = season_count, color = crime_type, group = crime_type)) +
+  geom_line(size = 0.3, alpha = 0.5) +  
+  geom_point(size = 0.5) +
+  labs(title = "Crime Counts by Crime Type By Season",
+       x = "Season",
+       y = "Number of Crimes",
+       color = "Area") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+
+ggplotly(crime_year)
+```
+
+## Weekday Trends
+### Crime Counts By Weekday
+```{r warning=FALSE, message=FALSE}
+data |>
+  group_by(weekday) |>
+  summarize(count = n()) |>
+  knitr::kable()
+```
+\
+加一段论述！！！！可以看到周五和周六的犯罪案件数显著多于一周中的其他日子。
+
+```{r warning=FALSE, message=FALSE}
+data |>
+  group_by(weekday) |>
+  summarize(weekday_count = n()) |>
+  ggplot(aes(x = as.factor(weekday), y = weekday_count, fill = weekday)) +
+  geom_bar(stat = "identity", width = 0.5) +  
+  geom_text(aes(label = weekday_count), vjust = -0.5, size = 3) +
+  labs(title = "Crime Counts By Weekday",
+       x = "Weekdays",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### Serious vs. Less Serious Crimes
+
+```{r warning=FALSE, message=FALSE}
+data |>
+  group_by(weekday, severity) |>
+  summarize(weekday_count = n()) |>
+  ggplot(aes(x = as.factor(weekday), y = weekday_count, fill = severity)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.5, alpha = 0.7) +  
+  geom_text(aes(label = weekday_count, group = severity), position = position_stack(vjust = 0.5)) +
+  labs(title = "Crime Counts By Weekday and Severity",
+       x = "Weekdays",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+```
+\
+Use chi-squared test to check if there is a significant relationship between weekdays and crime severity.
+```{r warning=FALSE, message=FALSE}
+weekday_ser = data |>
+  group_by(weekday, severity) |>
+  summarize(weekday_count = n()) |>
+  pivot_wider(
+    names_from = weekday,
+    values_from = weekday_count
+  )
+knitr::kable(weekday_ser)
+
+data_matrix = as.table(as.matrix(weekday_ser[, -1]))
+chi_result = chisq.test(data_matrix)
+chi_result
+```
+加一段论述！！！！！
+
+### Crime by Area
+Now, a line graph is used to show the change in the number of cases occurring in different weekdays and different case types.
+```{r warning=FALSE, message=FALSE}
+area_weekday = data |>
+  group_by(weekday, area) |>
+  summarize(weekday_count = n()) |>
+  ggplot(aes(x = as.factor(weekday), y = weekday_count, color = area, group = area)) +
+  geom_line(size = 0.5, alpha = 0.5) +  
+  geom_point(size = 0.7) +
+  labs(title = "Crime Counts by Area Over Weekday",
+       x = "Weekdays",
+       y = "Number of Crimes",
+       color = "Area") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplotly(area_weekday)
+  
+```
+加一段论述！！！！！
+
+### Crime Types Over Weekdays
+```{r warning=FALSE, message=FALSE}
+crime_weekday = data |>
+  group_by(crime_type, weekday) |>
+  summarize(weekday_count = n()) |>
+  mutate(weekday_count = ifelse(is.na(weekday_count), 0, weekday_count)) |>
+  ggplot(aes(x = weekday, y = weekday_count, color = crime_type, group = crime_type)) +
+  geom_line(size = 0.3, alpha = 0.5) +  
+  geom_point(size = 0.5) +
+  labs(title = "Crime Counts by Crime Type By Weekday",
+       x = "Weekdays",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+
+ggplotly(crime_weekday)
+```
+
+## Hourly Trends
+### Crime Counts By Hour of The Day
+```{r warning=FALSE, message=FALSE}
+data |>
+  group_by(hour_period) |>
+  summarize(count = n()) |>
+  knitr::kable()
+```
+
+```{r warning=FALSE, message=FALSE}
+count_hour = data |>
+  mutate(hour_period = as.factor(hour_period)) |>
+  group_by(hour_period) |>
+  summarize(hour_count = n()) |>
+  ggplot(aes(x = hour_period, y = hour_count, fill = hour_period)) +
+  geom_bar(stat = "identity", width = 0.5) +  
+  labs(title = "Crime Counts By The Hour Of The Day",
+       x = "Hour Periods",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplotly(count_hour)
+```
+
+### Serious vs. Less Serious Crimes
+
+```{r warning=FALSE, message=FALSE}
+ser_hour = data |>
+  mutate(hour_period = as.factor(hour_period)) |>
+  group_by(hour_period, severity) |>
+  summarize(hour_count = n()) |>
+  ggplot(aes(x = hour_period, y = hour_count, fill = severity)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.5, alpha = 0.7) +  
+  labs(title = "Crime Counts By Hour Of The Day",
+       x = "Hour Periods",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplotly(ser_hour)
+```
+\
+Use chi-squared test to check if there is a significant relationship between hour period of the day and crime severity.
+```{r warning=FALSE, message=FALSE}
+hour_ser = data |>
+  group_by(hour_period, severity) |>
+  summarize(hour_count = n()) |>
+  pivot_wider(
+    names_from = hour_period,
+    values_from = hour_count
+  )
+knitr::kable(hour_ser)
+
+data_matrix = as.table(as.matrix(hour_ser[, -1]))
+chi_result = chisq.test(data_matrix)
+chi_result
+```
+加论述！！！！
+
+### Crime by Area
+Now, a line graph is used to show the change in the number of cases occurring in different hour periods of the day and different case types.
+```{r warning=FALSE, message=FALSE}
+area_hour = data |>
+  group_by(hour_period, area) |>
+  summarize(hour_count = n()) |>
+  ggplot(aes(x = as.factor(hour_period), y = hour_count, color = area, group = area)) +
+  geom_line(size = 0.4, alpha = 0.5) +  
+  geom_point(size = 0.6) +
+  labs(title = "Crime Counts by Area Over Hour Period of The Day",
+       x = "Hour Periods",
+       y = "Number of Crimes",
+       color = "Area") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplotly(area_hour)
+  
+```
+\
+lunshu!!!
+
+### Crime Types By Hour Period of The Day
+```{r warning=FALSE, message=FALSE}
+crime_hour = data |>
+  group_by(crime_type, hour_period) |>
+  summarize(hour_count = n()) |>
+  mutate(hour_count = ifelse(is.na(hour_count), 0, hour_count)) |>
+  ggplot(aes(x = hour_period, y = hour_count, color = crime_type, group = crime_type)) +
+  geom_line(size = 0.3, alpha = 0.5) +  
+  geom_point(size = 0.5) +
+  labs(title = "Crime Counts by Crime Type By Hour Period of The Day",
+       x = "Hour Periods",
+       y = "Number of Crimes") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+
+ggplotly(crime_hour)
+```
+
+
+
+
+
