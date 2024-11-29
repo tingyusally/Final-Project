@@ -1,5 +1,6 @@
 ---
 title: "Crime Trends Over Time"
+author: "Linshan - lx2346" 
 output: 
   html_document:
     code_folding: hide
