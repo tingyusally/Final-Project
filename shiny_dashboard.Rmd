@@ -1,0 +1,316 @@
+---
+title: "Shiny Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(lubridate)
+library(plotly)
+
+crime <- read_csv("./data/crime_data_LA.csv")
+
+crime_prem = crime|>
+  separate(premis_desc, into = c("Col1", "Col2"), sep = " - ", extra = "merge")|>
+  select(-Col2)
+crime_lat = crime|>
+  filter(lat!= 0,
+         lon!= 0)
+prem_summary <- crime_prem |>
+  group_by(Col1) |>
+  summarise(TotalCrimes = n(),
+            Totalserious = sum(part_1_2 == 1),
+            Totalnotserious = sum(part_1_2 == 2)) %>%
+  arrange(desc(TotalCrimes))
+top_prem <- prem_summary %>%
+  mutate(Col1 = ifelse(row_number() > 20, "OTHERS", Col1)) %>%
+  group_by(Col1) %>%
+  summarise(TotalCrimes = sum(TotalCrimes),
+            Serious = sum(Totalserious),
+            Not_serious = sum(Totalnotserious)) %>%
+  arrange(desc(TotalCrimes))
+  
+top_prem|>
+  pivot_longer(
+    cols = c(Serious, Not_serious), 
+                          names_to = "CrimeType", values_to = "Count"
+  )
+
+crime_type = crime_prem|>
+  mutate(Col1 = if_else(Col1 %in% top_prem$Col1, Col1, 'OTHERS'))
+
+
+data2 = read_csv("./data/crime_data_LA.csv", na = c("NA", ".", ""))
+
+data2 = data2 |>
+  select(dr_no ,date = date_occ, time = time_occ, area = area_name, severity = part_1_2, crime_type = crm_cd_desc, premis = premis_desc) |>
+  mutate(
+    severity = case_when(
+      severity == 1 ~ "serious",
+      severity == 2 ~ "less serious"
+    ) )|>
+  mutate(severity = factor(severity, levels = c("less serious", "serious"), ordered = TRUE),
+         crime_type = tolower(crime_type))
+
+data2 = data2 |>
+  mutate(date = as.Date(sub(" .*", "", data2$date), format = "%m/%d/%Y"))
+data2$time = sprintf("%04s", as.character(data2$time))
+data2$time = format(strptime(data2$time, format="%H%M"), "%H:%M")
+
+data2 = data2 |>
+  mutate(
+    year_month = floor_date(data2$date, unit = "month"),
+    month = month(date),
+    season = case_when(
+      month %in% 3:5 ~ "Spring",
+      month %in% 6:8 ~ "Summer",
+      month %in% 9:11 ~ "Fall",
+      month %in% c(12,1,2) ~ "Winter",
+      TRUE ~ "Unknown"
+    ),
+    hour = sub(":(.*)", "", data2$time),
+    year = year(date),
+    weekday = wday(date, label = TRUE, abbr = FALSE)
+  )
+```
+
+```{r}
+# UI part -- chart a
+ui1 <- fluidPage(
+  titlePanel("Crime location in LA"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput(
+        "area_chart_a", 
+        "Select Area for Chart A:", 
+        choices = unique(crime_type$area_name),  
+        selected = unique(crime_type$area_name)[1]  
+      )
+    ),
+    mainPanel(
+      plotlyOutput("scatter_plot_chart_a")  # Chart A: Scatter Plot
+    )
+  )
+)
+```
+
+
+```{r}
+# UI part -- chart b
+ui2 <- fluidPage(
+  titlePanel("Crime Count in LA"),
+  
+# side bar
+  sidebarLayout(
+    sidebarPanel(
+      #time trend
+      selectInput(
+        inputId = "victim_time",
+        label = "Select Time Trend",
+        choices = c("Yearly", "Seasonal", "Weekday", "Hourly"),
+        selected = "Yearly"
+      ),
+      #area
+      selectInput(
+        inputId = "victim_area",
+        label = "Select Area",
+        choices = unique(data2$area)
+      )
+    ),
+    
+    mainPanel(
+      plotlyOutput("trend_plot")
+    )
+  )
+)
+```
+
+```{r}
+# UI part -- chart c
+
+data3 = read_csv("./data/crime_data_LA.csv", na = c("NA", ".", ""))
+# Notice that age 0 stands for NA
+data3$vict_age[data3$vict_age == 0] <- NA
+
+# divide age into four categories
+data3$age_group <- cut(
+  data3$vict_age,
+  breaks = c(-Inf, 18, 40, 60, Inf),
+  labels = c("juvenile", "Young adult", "Middle-aged people", "The elderly"),
+  right = FALSE
+)
+
+data3$severity_label <- ifelse(data3$part_1_2 == 1, "Serious", "Less Serious")
+
+# turn severity into factor
+data3$severity_label <- as.factor(data3$severity_label)
+
+ui3 <- fluidPage(
+  titlePanel("Age Distribution by Area"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("area", "Select Area:", choices = unique(data3$area_name), selected = unique(data3$area_name)[1])
+    ),
+    mainPanel(
+      plotlyOutput("boxplot")
+    )
+  )
+)
+```
+
+Column {data-width=450}
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r}
+server1 <- function(input1, output1) {
+  output1$scatter_plot_chart_a <- renderPlotly({
+    filtered_data_a <- crime_type %>%
+      filter(
+        lat != 0,
+        lon != 0,
+        area_name == input1$area_chart_a  
+      ) %>%
+      mutate(text_label = str_c(
+        "Area: ", area_name, "\nPremises: ", Col1,
+        "\nSerious Level: ", part_1_2, "\nStatus: ", status_desc
+      ))
+    
+    plot_ly(
+      data = filtered_data_a,
+      x = ~lat, y = ~lon, type = "scatter", mode = "markers",
+      color = ~factor(status_desc), alpha = 0.6, text = ~text_label,
+      marker = list(size = 4)
+    ) %>%
+      layout(
+        title = paste("Crime Data Scatter Plot in", input$area_chart_a),
+        xaxis = list(title = "Latitude"),
+        yaxis = list(title = "Longitude")
+      )
+  })
+}
+
+shinyApp(ui = ui1, server = server1)
+```
+
+Column {data-width=450}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r}
+server2 <- function(input2, output2) {
+  output2$trend_plot <- renderPlotly({
+    filtered_data2 <- data2 |>
+      filter(area == input2$victim_area) 
+    
+    if (nrow(filtered_data2) == 0) {
+      return(ggplotly(ggplot() + labs(title = "No Data Available for Selected Area")))
+    }
+    
+    if (input2$victim_time == "Yearly") {
+      yearly_data <- filtered_data2 |>
+        filter(year != 2024) |>
+        group_by(year) |>
+        summarize(year_count = n(), .groups = "drop") |>
+        ggplot(aes(x = as.factor(year), y = year_count, group = 1)) +
+        geom_line(size = 0.5, alpha = 0.7, color = "blue") +  
+        geom_point(size = 1, color = "blue") +
+        labs(title = paste("Crime Counts by Year in", input2$victim_area),
+             x = "Year",
+             y = "Number of Crimes") +
+        theme_minimal() +
+        theme(plot.title = element_text(hjust = 0.5))
+      
+      ggplotly(yearly_data)
+      
+    } else if (input2$victim_time == "Seasonal") {
+      seasonal_data <- filtered_data2 |>
+        mutate(season = factor(season, levels = c("Spring", "Summer", "Fall", "Winter"))) |>
+        group_by(season) |>
+        summarize(season_count = n(), .groups = "drop") |>
+        ggplot(aes(x = season, y = season_count, group = 1)) +
+        geom_line(size = 0.5, alpha = 0.7, color = "green") +  
+        geom_point(size = 1, color = "green") +
+        labs(title = paste("Crime Counts by Season in", input2$victim_area),
+             x = "Season",
+             y = "Number of Crimes") +
+        theme_minimal() +
+        theme(plot.title = element_text(hjust = 0.5))
+      
+      ggplotly(seasonal_data)
+      
+    } else if (input2$victim_time == "Weekday") {
+      weekday_data <- filtered_data2 |>
+        mutate(weekday = factor(weekday, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))) |>
+        group_by(weekday) |>
+        summarize(weekday_count = n(), .groups = "drop") |>
+        ggplot(aes(x = weekday, y = weekday_count, group = 1)) +
+        geom_line(size = 0.5, alpha = 0.7, color = "purple") +  
+        geom_point(size = 1, color = "purple") +
+        labs(title = paste("Crime Counts by Weekday in", input2$victim_area),
+             x = "Weekday",
+             y = "Number of Crimes") +
+        theme_minimal() +
+        theme(plot.title = element_text(hjust = 0.5))
+      
+      ggplotly(weekday_data)
+      
+    } else if (input2$victim_time == "Hourly") {
+      hourly_data <- filtered_data2 |>
+        group_by(hour) |>
+        summarize(hour_count = n(), .groups = "drop") |>
+        ggplot(aes(x = hour, y = hour_count, group = 1)) +
+        geom_line(size = 0.5, alpha = 0.7, color = "orange") +  
+        geom_point(size = 1, color = "orange") +
+        labs(title = paste("Crime Counts by Hour in", input2$victim_area),
+             x = "Hour",
+             y = "Number of Crimes") +
+        theme_minimal() +
+        theme(plot.title = element_text(hjust = 0.5))
+      
+      ggplotly(hourly_data)
+    } else {
+      ggplotly(ggplot() + labs(title = "Invalid Selection"))
+    }
+  })
+}
+shinyApp(ui = ui2, server = server2)
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+### Chart C
+
+```{r}
+server3 <- function(input3, output3) {
+  output3$boxplot <- renderPlotly({
+    filtered_data3 <- data3 %>% filter(area_name == input3$area)
+    
+    box_age_area <- ggplot(filtered_data3, aes(x = area_name, y = vict_age, fill = area_name)) +
+      geom_boxplot(outlier.color = "black", outlier.size = 0.5, alpha = 0.7) +
+      theme_minimal() +
+      labs(
+        title = "Age Distribution by Area",
+        x = "Area",
+        y = "Victim Age",
+        fill = "Area"
+      ) +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none"
+      )
+    
+    ggplotly(box_age_area) 
+  })
+}
+
+shinyApp(ui = ui3, server = server3)
+```
+
